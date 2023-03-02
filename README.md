@@ -4,6 +4,8 @@
 [![Dependency Status](https://deps.rs/repo/github/tokio-rs/prost/status.svg)](https://deps.rs/repo/github/tokio-rs/prost)
 [![Discord](https://img.shields.io/discord/500028886025895936)](https://discord.gg/tokio)
 
+NOTE:  This branch is just the same as the extensions branch, but with a different revision number.  This is useful if you want to use both this and mainline prost in your repository.  If you're just looking for this as a PR, then you just want the extensions branch, not this one
+
 # *PROST!*
 
 `prost` is a [Protocol Buffers](https://developers.google.com/protocol-buffers/)
