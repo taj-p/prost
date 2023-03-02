@@ -285,7 +285,7 @@ pub fn encoded_len_varint(value: u64) -> usize {
     ((((value | 1).leading_zeros() ^ 63) * 9 + 73) / 64) as usize
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum WireType {
     Varint = 0,
@@ -596,7 +596,7 @@ macro_rules! varint {
     );
 }
 varint!(bool, bool,
-        to_uint64(value) if *value { 1u64 } else { 0u64 },
+        to_uint64(value) u64::from(*value),
         from_uint64(value) value != 0);
 varint!(i32, int32);
 varint!(i64, int64);
@@ -1315,7 +1315,7 @@ macro_rules! map {
             encoded_len_with_default(key_encoded_len, val_encoded_len, &V::default(), tag, values)
         }
 
-        /// Generic protobuf map encode function with an overriden value default.
+        /// Generic protobuf map encode function with an overridden value default.
         ///
         /// This is necessary because enumeration values can have a default value other
         /// than 0 in proto2.
@@ -1355,7 +1355,7 @@ macro_rules! map {
             }
         }
 
-        /// Generic protobuf map merge function with an overriden value default.
+        /// Generic protobuf map merge function with an overridden value default.
         ///
         /// This is necessary because enumeration values can have a default value other
         /// than 0 in proto2.
@@ -1394,7 +1394,7 @@ macro_rules! map {
             Ok(())
         }
 
-        /// Generic protobuf map encode function with an overriden value default.
+        /// Generic protobuf map encode function with an overridden value default.
         ///
         /// This is necessary because enumeration values can have a default value other
         /// than 0 in proto2.
@@ -1465,7 +1465,7 @@ mod test {
         T: Debug + Default + PartialEq + Borrow<B>,
         B: ?Sized,
     {
-        prop_assume!(MIN_TAG <= tag && tag <= MAX_TAG);
+        prop_assume!((MIN_TAG..=MAX_TAG).contains(&tag));
 
         let expected_len = encoded_len(tag, value.borrow());
 
@@ -1554,7 +1554,7 @@ mod test {
         M: FnMut(WireType, &mut T, &mut Bytes, DecodeContext) -> Result<(), DecodeError>,
         L: FnOnce(u32, &B) -> usize,
     {
-        prop_assume!(MIN_TAG <= tag && tag <= MAX_TAG);
+        prop_assume!((MIN_TAG..=MAX_TAG).contains(&tag));
 
         let expected_len = encoded_len(tag, value.borrow());
 
@@ -1624,9 +1624,6 @@ mod test {
     #[test]
     fn varint() {
         fn check(value: u64, mut encoded: &[u8]) {
-            // TODO(rust-lang/rust-clippy#5494)
-            #![allow(clippy::clone_double_ref)]
-
             // Small buffer.
             let mut buf = Vec::with_capacity(1);
             encode_varint(value, &mut buf);
@@ -1639,7 +1636,8 @@ mod test {
 
             assert_eq!(encoded_len_varint(value), encoded.len());
 
-            let roundtrip_value = decode_varint(&mut encoded.clone()).expect("decoding failed");
+            let roundtrip_value =
+                decode_varint(&mut <&[u8]>::clone(&encoded)).expect("decoding failed");
             assert_eq!(value, roundtrip_value);
 
             let roundtrip_value = decode_varint_slow(&mut encoded).expect("slow decoding failed");

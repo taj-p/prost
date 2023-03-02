@@ -6,14 +6,19 @@ use std::fs;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
+use std::path::PathBuf;
 
 /// Test which bootstraps protobuf.rs and compiler.rs from the .proto definitions in the Protobuf
 /// repo. Ensures that the checked-in compiled versions are up-to-date.
 #[test]
 fn bootstrap() {
-    let protobuf = prost_build::protoc_include()
-        .join("google")
-        .join("protobuf");
+    let include = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("tests")
+        .join("src")
+        .join("include");
+    let protobuf = include.join("google").join("protobuf");
 
     let tempdir = tempfile::Builder::new()
         .prefix("prost-types-bootstrap")
@@ -22,7 +27,7 @@ fn bootstrap() {
 
     prost_build::Config::new()
         .compile_well_known_types()
-        .btree_map(&["."])
+        .btree_map(["."])
         .out_dir(tempdir.path())
         .compile_protos(
             &[
@@ -40,7 +45,7 @@ fn bootstrap() {
                 protobuf.join("timestamp.proto"),
                 protobuf.join("type.proto"),
             ],
-            &[""],
+            &[include],
         )
         .unwrap();
 

@@ -1,8 +1,9 @@
 [package]
 name = "prost"
-version = "0.10.1"
+version = "0.11.8"
 authors = [
     "Dan Burkert <dan@danburkert.com>",
+    "Lucio Franco <luciofranco14@gmail.com",
     "Tokio Contributors <team@tokio.rs>",
 ]
 license = "Apache-2.0"
@@ -12,7 +13,8 @@ readme = "README.md"
 description = "A Protocol Buffers implementation for the Rust Language."
 keywords = ["protobuf", "serialization"]
 categories = ["encoding"]
-edition = "2018"
+edition = "2021"
+rust-version = "1.60"
 
 [workspace]
 members = [
@@ -33,7 +35,6 @@ exclude = [
   "fuzz",
   # Same counts for the afl fuzz targets
   "afl",
-  "test-vendored"
 ]
 
 [lib]
@@ -47,7 +48,7 @@ std = []
 
 [dependencies]
 bytes = { version = "1", default-features = false }
-prost-derive = { version = "0.10.0", path = "prost-derive", optional = true }
+prost-derive = { version = "0.11.8", path = "prost-derive", optional = true }
 
 [dev-dependencies]
 criterion = "0.3"

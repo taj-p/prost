@@ -116,7 +116,7 @@ pub mod default_string_escape {
 use alloc::vec::Vec;
 
 use anyhow::anyhow;
-use bytes::Buf;
+use prost::bytes::Buf;
 
 use prost::Message;
 
@@ -533,6 +533,55 @@ mod tests {
         assert_eq!(
             msg.privacy_level_4(),
             default_enum_value::PrivacyLevel::PrivacyLevelprivacyLevelFour
+        );
+    }
+
+    #[test]
+    fn test_enum_to_string() {
+        use default_enum_value::{ERemoteClientBroadcastMsg, PrivacyLevel};
+
+        assert_eq!(PrivacyLevel::One.as_str_name(), "PRIVACY_LEVEL_ONE");
+        assert_eq!(PrivacyLevel::Two.as_str_name(), "PRIVACY_LEVEL_TWO");
+        assert_eq!(
+            PrivacyLevel::PrivacyLevelThree.as_str_name(),
+            "PRIVACY_LEVEL_PRIVACY_LEVEL_THREE"
+        );
+        assert_eq!(
+            PrivacyLevel::PrivacyLevelprivacyLevelFour.as_str_name(),
+            "PRIVACY_LEVELPRIVACY_LEVEL_FOUR"
+        );
+
+        assert_eq!(
+            ERemoteClientBroadcastMsg::KERemoteClientBroadcastMsgDiscovery.as_str_name(),
+            "k_ERemoteClientBroadcastMsgDiscovery"
+        );
+    }
+
+    #[test]
+    fn test_enum_from_string() {
+        use default_enum_value::{ERemoteClientBroadcastMsg, PrivacyLevel};
+
+        assert_eq!(
+            Some(PrivacyLevel::One),
+            PrivacyLevel::from_str_name("PRIVACY_LEVEL_ONE")
+        );
+        assert_eq!(
+            Some(PrivacyLevel::Two),
+            PrivacyLevel::from_str_name("PRIVACY_LEVEL_TWO")
+        );
+        assert_eq!(
+            Some(PrivacyLevel::PrivacyLevelThree),
+            PrivacyLevel::from_str_name("PRIVACY_LEVEL_PRIVACY_LEVEL_THREE")
+        );
+        assert_eq!(
+            Some(PrivacyLevel::PrivacyLevelprivacyLevelFour),
+            PrivacyLevel::from_str_name("PRIVACY_LEVELPRIVACY_LEVEL_FOUR")
+        );
+        assert_eq!(None, PrivacyLevel::from_str_name("PRIVACY_LEVEL_FIVE"));
+
+        assert_eq!(
+            Some(ERemoteClientBroadcastMsg::KERemoteClientBroadcastMsgDiscovery),
+            ERemoteClientBroadcastMsg::from_str_name("k_ERemoteClientBroadcastMsgDiscovery")
         );
     }
 

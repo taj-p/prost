@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/prost-types/0.10.1")]
+#![doc(html_root_url = "https://docs.rs/prost-types/0.11.8")]
 
 //! Protocol Buffers well-known types.
 //!
@@ -11,6 +11,12 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[rustfmt::skip]
+pub mod compiler;
+mod datetime;
+#[rustfmt::skip]
+mod protobuf;
+
 use core::convert::TryFrom;
 use core::fmt;
 use core::i32;
@@ -18,12 +24,7 @@ use core::i64;
 use core::str::FromStr;
 use core::time;
 
-include!("protobuf.rs");
-pub mod compiler {
-    include!("compiler.rs");
-}
-
-mod datetime;
+pub use protobuf::*;
 
 // The Protobuf `Duration` and `Timestamp` types can't delegate to the standard library equivalents
 // because the Protobuf versions are signed. To make them easier to work with, `From` conversions
@@ -104,7 +105,7 @@ impl TryFrom<Duration> for time::Duration {
     /// Converts a `Duration` to a `std::time::Duration`, failing if the duration is negative.
     fn try_from(mut duration: Duration) -> Result<time::Duration, DurationError> {
         duration.normalize();
-        if duration.seconds >= 0 {
+        if duration.seconds >= 0 && duration.nanos >= 0 {
             Ok(time::Duration::new(
                 duration.seconds as u64,
                 duration.nanos as u32,
@@ -142,6 +143,7 @@ impl fmt::Display for Duration {
 }
 
 /// A duration handling error.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, PartialEq)]
 #[non_exhaustive]
 pub enum DurationError {
@@ -232,6 +234,25 @@ impl Timestamp {
         //               "invalid timestamp: {:?}", self);
     }
 
+    /// Normalizes the timestamp to a canonical format, returning the original value if it cannot be
+    /// normalized.
+    ///
+    /// Normalization is based on [`google::protobuf::util::CreateNormalized`][1].
+    ///
+    /// [1]: https://github.com/google/protobuf/blob/v3.3.2/src/google/protobuf/util/time_util.cc#L59-L77
+    pub fn try_normalize(mut self) -> Result<Timestamp, Timestamp> {
+        let before = self.clone();
+        self.normalize();
+        // If the seconds value has changed, and is either i64::MIN or i64::MAX, then the timestamp
+        // normalization overflowed.
+        if (self.seconds == i64::MAX || self.seconds == i64::MIN) && self.seconds != before.seconds
+        {
+            Err(before)
+        } else {
+            Ok(self)
+        }
+    }
+
     /// Creates a new `Timestamp` at the start of the provided UTC date.
     pub fn date(year: i64, month: u8, day: u8) -> Result<Timestamp, TimestampError> {
         Timestamp::date_time_nanos(year, month, day, 0, 0, 0, 0)
@@ -315,6 +336,7 @@ impl From<std::time::SystemTime> for Timestamp {
 }
 
 /// A timestamp handling error.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, PartialEq)]
 #[non_exhaustive]
 pub enum TimestampError {
@@ -368,8 +390,13 @@ impl TryFrom<Timestamp> for std::time::SystemTime {
         let system_time = if timestamp.seconds >= 0 {
             std::time::UNIX_EPOCH.checked_add(time::Duration::from_secs(timestamp.seconds as u64))
         } else {
-            std::time::UNIX_EPOCH
-                .checked_sub(time::Duration::from_secs((-timestamp.seconds) as u64))
+            std::time::UNIX_EPOCH.checked_sub(time::Duration::from_secs(
+                timestamp
+                    .seconds
+                    .checked_neg()
+                    .ok_or_else(|| TimestampError::OutOfSystemRange(timestamp.clone()))?
+                    as u64,
+            ))
         };
 
         let system_time = system_time.and_then(|system_time| {
@@ -425,8 +452,10 @@ mod tests {
 
         #[test]
         fn check_duration_roundtrip(
-            std_duration in time::Duration::arbitrary(),
+            seconds in u64::arbitrary(),
+            nanos in 0u32..1_000_000_000u32,
         ) {
+            let std_duration = time::Duration::new(seconds, nanos);
             let prost_duration = match Duration::try_from(std_duration) {
                 Ok(duration) => duration,
                 Err(_) => return Err(TestCaseError::reject("duration out of range")),
@@ -447,6 +476,51 @@ mod tests {
                 )
             }
         }
+
+        #[test]
+        fn check_duration_roundtrip_nanos(
+            nanos in u32::arbitrary(),
+        ) {
+            let seconds = 0;
+            let std_duration = std::time::Duration::new(seconds, nanos);
+            let prost_duration = match Duration::try_from(std_duration) {
+                Ok(duration) => duration,
+                Err(_) => return Err(TestCaseError::reject("duration out of range")),
+            };
+            prop_assert_eq!(time::Duration::try_from(prost_duration.clone()).unwrap(), std_duration);
+
+            if std_duration != time::Duration::default() {
+                let neg_prost_duration = Duration {
+                    seconds: -prost_duration.seconds,
+                    nanos: -prost_duration.nanos,
+                };
+
+                prop_assert!(
+                    matches!(
+                        time::Duration::try_from(neg_prost_duration),
+                        Err(DurationError::NegativeDuration(d)) if d == std_duration,
+                    )
+                )
+            }
+        }
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn check_duration_try_from_negative_nanos() {
+        let seconds: u64 = 0;
+        let nanos: u32 = 1;
+        let std_duration = std::time::Duration::new(seconds, nanos);
+
+        let neg_prost_duration = Duration {
+            seconds: 0,
+            nanos: -1,
+        };
+
+        assert!(matches!(
+           time::Duration::try_from(neg_prost_duration),
+           Err(DurationError::NegativeDuration(d)) if d == std_duration,
+        ))
     }
 
     #[cfg(feature = "std")]
