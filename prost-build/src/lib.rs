@@ -141,6 +141,7 @@ use std::process::Command;
 use log::debug;
 use log::trace;
 
+use prost::ExtensionRegistry;
 use prost::Message;
 use prost_types::{FileDescriptorProto, FileDescriptorSet};
 
@@ -988,6 +989,7 @@ impl Config {
         &mut self,
         protos: &[impl AsRef<Path>],
         includes: &[impl AsRef<Path>],
+        extension_registry: Option<ExtensionRegistry>,
     ) -> Result<()> {
         // TODO: This should probably emit 'rerun-if-changed=PATH' directives for cargo, however
         // according to [1] if any are output then those paths replace the default crate root,
@@ -1069,12 +1071,22 @@ impl Config {
                 ),
             )
         })?;
-        let file_descriptor_set = FileDescriptorSet::decode(&*buf).map_err(|error| {
-            Error::new(
-                ErrorKind::InvalidInput,
-                format!("invalid FileDescriptorSet: {}", error),
-            )
-        })?;
+
+        let file_descriptor_set = if let Some(registry) = extension_registry {
+            FileDescriptorSet::decode_with_extensions(&*buf, registry).map_err(|error| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("invalid FileDescriptorSet: {}", error),
+                )
+            })?
+        } else {
+            FileDescriptorSet::decode(&*buf).map_err(|error| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("invalid FileDescriptorSet: {}", error),
+                )
+            })?
+        };
 
         self.compile_fds(file_descriptor_set)
     }
@@ -1378,7 +1390,7 @@ impl fmt::Display for Module {
 /// [3]: https://developers.google.com/protocol-buffers/docs/proto3#importing-definitions
 /// [4]: https://developers.google.com/protocol-buffers/docs/proto#packages
 pub fn compile_protos(protos: &[impl AsRef<Path>], includes: &[impl AsRef<Path>]) -> Result<()> {
-    Config::new().compile_protos(protos, includes)
+    Config::new().compile_protos(protos, includes, None)
 }
 
 /// Compile a [`FileDescriptorSet`] into Rust files during a Cargo build.
