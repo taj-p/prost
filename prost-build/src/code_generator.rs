@@ -26,12 +26,6 @@ enum Syntax {
     Proto3,
 }
 
-macro_rules! p {
-    ($($tokens: tt)*) => {
-        println!("cargo:warning={}", format!($($tokens)*))
-    }
-}
-
 pub struct CodeGenerator<'a> {
     config: &'a mut Config,
     package: String,
@@ -114,8 +108,6 @@ impl<'a> CodeGenerator<'a> {
 
         if code_gen.config.service_generator.is_some() {
             code_gen.path.push(6);
-            p!("Inside");
-            p!("{:?}", file.service);
             for (idx, service) in file.service.into_iter().enumerate() {
                 code_gen.path.push(idx as i32);
                 code_gen.push_service(service);
